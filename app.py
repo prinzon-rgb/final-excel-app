@@ -123,11 +123,10 @@ def transform_excel(df_a):
   return df_b
 
 # --- 2. The Streamlit User Interface ---
-st.set_page_config(layout="centered", page_title="Excel Transformation Agent")
-st.title("📄 Boots Coupons Excel Transformation Agent")
+st.set_page_config(layout="wide", page_title="Excel Transformation Agent")
+st.title("📄 Boots Coupons Excel Agent")
 st.write(
-"This tool automates the transformation of Excel files."
-"Please upload your **source Excel file** to convert it to the required format for deployment."
+"This tool automates the transformation of Excel files. Please upload your **source file** to convert it to the required format for deployment."
 )
 st.divider()
 
