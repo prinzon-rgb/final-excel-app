@@ -132,9 +132,9 @@ with col1:
 
 with col2:
   st.title("Boots Coupons Excel Transformation Agent") # Display your title in the second column
-st.write(
-"This tool automates the transformation of Excel files. Please upload your **source file** to convert it to the required format for deployment."
-)
+  st.write(
+    "This tool automates the transformation of Excel files. Please upload your **source file** to convert it to the required format for deployment."
+    )
 st.divider()
 
 uploaded_file = st.file_uploader(
