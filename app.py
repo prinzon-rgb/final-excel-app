@@ -131,9 +131,9 @@ with col1:
   st.image("Logo.png", width=200) # Display your logo in the first column
 
 with col2:
-  st.title("Boots Coupons Excel Transformation Agent") # Display your title in the second column
+  st.title("Boots Coupons Excel Agent") # Display your title in the second column
   st.write(
-    "This tool converts/transforms the source excel file for deployment in the required format. Please upload your **source file** below."
+    "This tool converts/transforms the source excel file to the required format for deployment. Please upload your **source file** below."
     )
 st.divider()
 
