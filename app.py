@@ -128,7 +128,7 @@ st.set_page_config(layout="wide", page_title="Excel Transformation Agent")
 col1, col2 = st.columns([1, 6]) # The numbers define the relative width (1:6 ratio)
 
 with col1:
-  st.image("Logo.png", width=150) # Display your logo in the first column
+  st.image("Logo.png", width=200) # Display your logo in the first column
 
 with col2:
   st.title("Boots Coupons Excel Transformation Agent") # Display your title in the second column
