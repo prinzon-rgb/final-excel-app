@@ -124,7 +124,7 @@ def transform_excel(df_a):
 
 # --- 2. The Streamlit User Interface ---
 st.set_page_config(layout="centered", page_title="Excel Transformation Agent")
-st.title("📄 Excel Transformation Agent")
+st.title("📄 Boots Coupons Excel Transformation Agent")
 st.write(
 "This tool automates the transformation of Excel files. Upload your file below to begin."
 )
