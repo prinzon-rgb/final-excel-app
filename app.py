@@ -126,7 +126,8 @@ def transform_excel(df_a):
 st.set_page_config(layout="centered", page_title="Excel Transformation Agent")
 st.title("📄 Boots Coupons Excel Transformation Agent")
 st.write(
-"This tool automates the transformation of Excel files. Upload your file below to begin."
+"This tool automates the transformation of Excel files."
+"Please upload your **source Excel file** to convert it to the required format for deployment."
 )
 st.divider()
 
