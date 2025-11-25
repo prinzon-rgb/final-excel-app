@@ -173,3 +173,12 @@ if uploaded_file is not None:
   except Exception as e:
         st.error(f"An error occurred: {e}")
         st.warning("Please ensure the uploaded file has a compatible structure.")
+    
+# --- Footer ---
+st.markdown("---")
+st.markdown(
+"<div style='text-align: center; color: grey; font-size: 0.9em;'>"
+"Developed by prince john | Contact <a href='mailto:prince.john@hogarth.com'>prince.john@hogarth.com</a> for any assistance"
+"</div>",
+unsafe_allow_html=True
+)
