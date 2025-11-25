@@ -174,11 +174,35 @@ if uploaded_file is not None:
         st.error(f"An error occurred: {e}")
         st.warning("Please ensure the uploaded file has a compatible structure.")
     
-# --- Footer ---
-st.markdown("---")
-st.markdown(
-"<div style='text-align: center; color: grey; font-size: 0.9em;'>"
-"Developed by prince john | Contact <a href='mailto:prince.john@hogarth.com'>prince.john@hogarth.com</a> for any assistance"
-"</div>",
-unsafe_allow_html=True
-)
+# --- Sticky Footer ---
+footer_css = """
+<style>
+.footer {
+position: fixed;
+left: 0;
+bottom: 0;
+width: 100%;
+background-color: #0E1117; /* Matches Streamlit's dark theme background */
+color: grey;
+text-align: center;
+padding: 10px;
+font-size: 0.7em;
+border-top: 1px solid #262730; /* A subtle top border */
+}
+.footer a {
+color: #FF4B4B; /* Streamlit's primary red color for links */
+text-decoration: none;
+}
+.footer a:hover {
+text-decoration: underline;
+}
+</style>
+"""
+
+footer_html = """
+<div class="footer">
+Developed by Prince John | Contact <a href='mailto:prince.john@hogarth.com' target="_blank">prince.john@hogarth.com</a> for any assistance
+</div>
+"""
+
+st.markdown(footer_css + footer_html, unsafe_allow_html=True)
