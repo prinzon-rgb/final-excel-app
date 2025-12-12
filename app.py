@@ -139,26 +139,35 @@ def transform_excel(df_a):
 
 # --- Function to write to Excel with auto-sizing (requires xlsxwriter) ---
 def write_excel_with_autosize(df, buffer):
-    """Writes DataFrame to an Excel buffer with auto-sized columns and wrapped text."""
-    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Sheet1')
-        
-        workbook = writer.book
-        worksheet = writer.sheets['Sheet1']
-        wrap_format = workbook.add_format({'text_wrap': True, 'valign': 'top'})
+"""Writes DataFrame to an Excel buffer with custom column widths and wrapped text."""
+with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+    df.to_excel(writer, index=False, sheet_name='Sheet1')
     
-        # --- THIS IS THE SIMPLIFIED AND CORRECTED LOGIC ---
-        for i, col in enumerate(df.columns):
-            # Find the maximum length of the content in the column,
-            # considering the longest line in multi-line cells.
-            max_content_len = df[col].astype(str).apply(lambda x: max(len(line) for line in x.split('\n'))).max()
-            
+    workbook = writer.book
+    worksheet = writer.sheets['Sheet1']
+    wrap_format = workbook.add_format({'text_wrap': True, 'valign': 'top'})
+
+    # Loop through each column and set the width
+    for i, col in enumerate(df.columns):
+        # --- FIX: Set specific width for 'Conditions_1' column ---
+        if col == 'Conditions_1':
+            column_width = 60
+        else:
+            # Use original auto-sizing logic for all other columns
+            # Find the maximum length of the content in the column, considering multi-line cells.
+            try:
+                max_content_len = df[col].astype(str).apply(lambda x: max(len(line) for line in x.split('\n'))).max()
+            except (ValueError, TypeError):
+                max_content_len = 0
+
             # Find the length of the column header itself
             header_len = len(col)
             
             # Set the column width to be the larger of the two, with a little padding
             column_width = max(max_content_len, header_len) + 2
-            worksheet.set_column(i, i, column_width, wrap_format)
+        
+        # Set the column width and apply the wrap format
+        worksheet.set_column(i, i, column_width, wrap_format)
         
 # --- 2. The Streamlit User Interface ---
 st.set_page_config(layout="wide", page_title="Boots Coupons Excel Transformation Agent")
