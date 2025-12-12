@@ -3,17 +3,14 @@ import pandas as pd
 import numpy as np
 from io import BytesIO
 
-# --- 1. The Core Transformation Logic (with all final corrections) ---
+# --- 1. The Core Transformation Logic ---
 def transform_excel(df_a):
   """
   Transforms a DataFrame from Format A to Format B, matching the BA team's output exactly.
   """
-  # Clean all column names to prevent errors from extra spaces
   df_a.columns = [col.strip() for col in df_a.columns]
-  
   df_b = pd.DataFrame()
   
-  # Basic Column Mapping
   offer_code = df_a.get('Offer Code', pd.Series(dtype='str')).fillna('')
   tnc_no = df_a.get('T&C no.', pd.Series(dtype='str')).fillna('')
   df_b['ITEM NO'] = offer_code + tnc_no
@@ -35,7 +32,6 @@ def transform_excel(df_a):
       return '(Default)'
   df_b['Layout_Types'] = df_a.apply(determine_layout_type, axis=1)
   
-  # FINAL CORRECTED LOGIC for Validity: Use a single '\n' for a real newline.
   date_col_name = next((col for col in df_a.columns if 'Date for Coupons' in col), None)
   df_b['Validity'] = df_a[date_col_name].apply(lambda x: f"Valid {x.replace(' to ', '\nto ')}" if x else '') if date_col_name else ''
   
@@ -81,14 +77,10 @@ def transform_excel(df_a):
   
   df_b['_Descriptor'] = df_a.get('Small Print\nInclusions/Exclusions/Medical Information if needed. Use full stop and commas', '')
   
-  # FINAL CORRECTED LOGIC for Conditions_1: Handles double newlines, URL cases, and strips all lines.
   def format_conditions_1(text):
       if not isinstance(text, str) or not text.strip(): return ''
-      # Split by newline, strip each line of whitespace, and filter out any that became empty
       lines = [line.strip() for line in text.split('\n') if line.strip()]
-      # Join with double newlines to create the blank lines between paragraphs
       processed_text = '\n\n'.join(lines)
-      # Find and fix the specific case where a URL follows "please visit"
       processed_text = processed_text.replace('please visit\n\n', 'please visit\n')
       return processed_text
 
@@ -111,29 +103,33 @@ def transform_excel(df_a):
   final_columns = ['ITEM NO', 'Layout_Types', 'Validity', 'Point1', 'Point2', 'Point3', 'LogoName', 'Offers', '_Descriptor', 'Offer_types', 'Conditions_1', 'Conditions_3', '_CodeStyles', 'Barcode', 'Boots_Filename']
   df_b = df_b.reindex(columns=final_columns, fill_value='')
 
-  # Final cleaning pass to strip all string cells
   df_b = df_b.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
   return df_b
 
 # --- Function to write to Excel with auto-sizing (requires xlsxwriter) ---
 def write_excel_with_autosize(df, buffer):
+  """Writes DataFrame to an Excel buffer with auto-sized columns and wrapped text."""
   with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
       df.to_excel(writer, index=False, sheet_name='Sheet1')
+      
       workbook = writer.book
       worksheet = writer.sheets['Sheet1']
       wrap_format = workbook.add_format({'text_wrap': True, 'valign': 'top'})
-      for idx, col in enumerate(df):
-          series = df[col]
-          # Calculate max length for column width
-          # For multi-line cells, we take the length of the longest line
-          max_len = max(
-              series.astype(str).apply(lambda x: max(len(line) for line in x.split('\n')) if '\n' in x else len(x))).max(),
-              len(str(series.name))
-          ) + 2 # Add a little extra padding
-          worksheet.set_column(idx, idx, max_len)
-      worksheet.conditional_format(0, 0, len(df), len(df.columns)-1, {'type': 'no_errors', 'format': wrap_format})
 
+      # --- THIS IS THE SIMPLIFIED AND CORRECTED LOGIC ---
+      for i, col in enumerate(df.columns):
+          # Find the maximum length of the content in the column,
+          # considering the longest line in multi-line cells.
+          max_content_len = df[col].astype(str).apply(lambda x: max(len(line) for line in x.split('\n'))).max()
+          
+          # Find the length of the column header itself
+          header_len = len(col)
+          
+          # Set the column width to be the larger of the two, with a little padding
+          column_width = max(max_content_len, header_len) + 2
+          worksheet.set_column(i, i, column_width, wrap_format)
+          
 # --- 2. The Streamlit User Interface ---
 st.set_page_config(layout="wide", page_title="Boots Coupons Excel Transformation Agent")
 col1, col2 = st.columns([1, 6])
@@ -141,15 +137,9 @@ with col1:
 st.image("Logo.png", width=200)
 with col2:
 st.title("Boots Coupons Excel Agent")
-st.write(
-  "This tool converts/transforms the source excel file to the required format for deployment. Please upload your **source file** below."
-  )
+st.write("This tool converts/transforms the source excel file to the required format for deployment. Please upload your **source file** below.")
 st.divider()
-uploaded_file = st.file_uploader(
-"Choose an Excel file",
-type="xlsx",
-help="Upload the source Excel file to be transformed."
-)
+uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx", help="Upload the source Excel file to be transformed.")
 if uploaded_file is not None:
 try:
       st.info(f"Processing `{uploaded_file.name}`...")
@@ -176,24 +166,12 @@ except Exception as e:
 footer_css = """
 <style>
 .footer {
-position: fixed;
-left: 0;
-bottom: 0;
-width: 100%;
-background-color: #0E1117;
-color: grey;
-text-align: center;
-padding: 10px;
-font-size: 0.7em;
-border-top: 1px solid #262730;
+position: fixed; left: 0; bottom: 0; width: 100%;
+background-color: #0E1117; color: grey; text-align: center;
+padding: 10px; font-size: 0.7em; border-top: 1px solid #262730;
 }
-.footer a {
-color: #FF4B4B;
-text-decoration: none;
-}
-.footer a:hover {
-text-decoration: underline;
-}
+.footer a { color: #FF4B4B; text-decoration: none; }
+.footer a:hover { text-decoration: underline; }
 </style>
 """
 footer_html = """
