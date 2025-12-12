@@ -92,23 +92,26 @@ def transform_excel(df_a):
     
     df_b['_Descriptor'] = df_a.get('Small Print\nInclusions/Exclusions/Medical Information if needed. Use full stop and commas', '')
     
+# Conditions_1 Formatting (Specific Pattern Logic)
     def format_conditions_1(text):
         if not isinstance(text, str) or not text.strip(): return ''
-        # Split by newline and strip whitespace from each line
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         
         if not lines: return ''
-        
-        # UPDATED LOGIC: Use single newline joining for everything to fix list spacing
-        processed_text = '\n'.join(lines)
+        if len(lines) == 1: return lines[0]
     
-        # Keep the URL fix
-        processed_text = processed_text.replace('please visit\n', 'please visit\n')
-        # Ensure URL stays close to previous line if logic separated them wrongly, 
-        # but single join usually fixes this naturally. 
-        # Adding specific fix for standard T&C double spacing if strictly required by specific rows,
-        # but defaulting to single '\n' per feedback for lists.
+        # Pattern: Header -> Single Enter -> First Sentence
+        first_block = lines[0] + '\n' + lines[1]
         
+        if len(lines) > 2:
+            # Pattern: Subsequent paragraphs separated by Double Enter
+            rest_of_text = '\n\n'.join(lines[2:])
+            processed_text = first_block + '\n\n' + rest_of_text
+        else:
+            processed_text = first_block
+    
+        # URL Exception
+        processed_text = processed_text.replace('please visit\n\n', 'please visit\n')
         return processed_text
     
     if 'T&Cs Description' in df_a.columns:
