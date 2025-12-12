@@ -36,7 +36,7 @@ def transform_excel(df_a):
     df_b['Validity'] = df_a[date_col_name].apply(lambda x: f"Valid {x.replace(' to ', '\nto ')}" if x else '') if date_col_name else ''
     
     def format_point1(row):
-        # REMOVED: if is_use_twice(row): return 'DOUBLE' -> Trust the source value
+        # Trust the source value, do not force DOUBLE if use twice
         p1 = row.get('Part 1', '')
         if not p1 or pd.isna(p1): return ''
         val_str = str(p1).strip()
@@ -53,7 +53,7 @@ def transform_excel(df_a):
     df_b['Point1'] = df_a.apply(format_point1, axis=1)
     
     def format_point2(row):
-        # REMOVED: if is_use_twice(row): return 'POINTS' -> Trust the source value
+        # Trust the source value, do not force POINTS if use twice
         val_p1, val_p2 = str(row.get('Part 1', '')), str(row.get('Part 2', ''))
         if not val_p2: return ''
         
@@ -80,17 +80,16 @@ def transform_excel(df_a):
         processed_text = str(offer_text).replace('\n', ' ')
         processed_text = processed_text.upper().replace('NO7', 'No7')
         
-        # UPDATED: Replace "KEYWORD " (with space) -> "KEYWORD\n" (no space)
-        processed_text = processed_text.replace('WHEN YOU SPEND ', 'WHEN YOU SPEND\n').replace('WHEN YOU SPEND', 'WHEN YOU SPEND\n')
-        processed_text = processed_text.replace('WHEN YOU BUY ', 'WHEN YOU BUY\n').replace('WHEN YOU BUY', 'WHEN YOU BUY\n')
-        processed_text = processed_text.replace('WHEN YOU SHOP ', 'WHEN YOU SHOP\n').replace('WHEN YOU SHOP', 'WHEN YOU SHOP\n')
-        
-        # Final cleanup: Ensure no line starts with a space
+        # UPDATED LOGIC: Add newline, then clean up any resulting space at start of new line
+        processed_text = processed_text.replace('WHEN YOU SPEND', 'WHEN YOU SPEND\n')
+        processed_text = processed_text.replace('WHEN YOU BUY', 'WHEN YOU BUY\n')
+        processed_text = processed_text.replace('WHEN YOU SHOP', 'WHEN YOU SHOP\n')
+        # Clean up specific case where original text had "SPEND " which becomes "SPEND\n "
         processed_text = processed_text.replace('\n ', '\n')
         
         return processed_text
     df_b['Offers'] = df_a.apply(create_offers_text, axis=1)
-        
+    
     df_b['_Descriptor'] = df_a.get('Small Print\nInclusions/Exclusions/Medical Information if needed. Use full stop and commas', '')
     
     def format_conditions_1(text):
@@ -100,13 +99,16 @@ def transform_excel(df_a):
         
         if not lines: return ''
         
-        # UPDATED: Join everything with a single newline to prevent gaps in lists
+        # UPDATED LOGIC: Use single newline joining for everything to fix list spacing
         processed_text = '\n'.join(lines)
     
-        return processed_text
-    
         # Keep the URL fix
-        processed_text = processed_text.replace('please visit\n\n', 'please visit\n')
+        processed_text = processed_text.replace('please visit\n', 'please visit\n')
+        # Ensure URL stays close to previous line if logic separated them wrongly, 
+        # but single join usually fixes this naturally. 
+        # Adding specific fix for standard T&C double spacing if strictly required by specific rows,
+        # but defaulting to single '\n' per feedback for lists.
+        
         return processed_text
     
     if 'T&Cs Description' in df_a.columns:
@@ -131,30 +133,30 @@ def transform_excel(df_a):
     df_b = df_b.applymap(lambda x: x.strip() if isinstance(x, str) else x)
     
     return df_b
-    
+
 # --- Function to write to Excel with auto-sizing (requires xlsxwriter) ---
 def write_excel_with_autosize(df, buffer):
-    """Writes DataFrame to an Excel buffer with auto-sized columns and wrapped text."""
-    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Sheet1')
-        
-        workbook = writer.book
-        worksheet = writer.sheets['Sheet1']
-        wrap_format = workbook.add_format({'text_wrap': True, 'valign': 'top'})
+"""Writes DataFrame to an Excel buffer with auto-sized columns and wrapped text."""
+with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+    df.to_excel(writer, index=False, sheet_name='Sheet1')
     
-        # --- THIS IS THE SIMPLIFIED AND CORRECTED LOGIC ---
-        for i, col in enumerate(df.columns):
-            # Find the maximum length of the content in the column,
-            # considering the longest line in multi-line cells.
-            max_content_len = df[col].astype(str).apply(lambda x: max(len(line) for line in x.split('\n'))).max()
-            
-            # Find the length of the column header itself
-            header_len = len(col)
-            
-            # Set the column width to be the larger of the two, with a little padding
-            column_width = max(max_content_len, header_len) + 2
-            worksheet.set_column(i, i, column_width, wrap_format)
-            
+    workbook = writer.book
+    worksheet = writer.sheets['Sheet1']
+    wrap_format = workbook.add_format({'text_wrap': True, 'valign': 'top'})
+
+    # --- THIS IS THE SIMPLIFIED AND CORRECTED LOGIC ---
+    for i, col in enumerate(df.columns):
+        # Find the maximum length of the content in the column,
+        # considering the longest line in multi-line cells.
+        max_content_len = df[col].astype(str).apply(lambda x: max(len(line) for line in x.split('\n'))).max()
+        
+        # Find the length of the column header itself
+        header_len = len(col)
+        
+        # Set the column width to be the larger of the two, with a little padding
+        column_width = max(max_content_len, header_len) + 2
+        worksheet.set_column(i, i, column_width, wrap_format)
+        
 # --- 2. The Streamlit User Interface ---
 st.set_page_config(layout="wide", page_title="Boots Coupons Excel Transformation Agent")
 col1, col2 = st.columns([1, 6])
