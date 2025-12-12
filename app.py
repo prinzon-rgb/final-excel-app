@@ -175,10 +175,10 @@ with col1:
   st.image("Logo.png", width=200)
 
 with col2:
-st.title("Boots Coupons Excel Agent")
-st.write(
-  "This tool converts/transforms the source excel file to the required format for deployment. Please upload your **source file** below."
-  )
+  st.title("Boots Coupons Excel Agent")
+  st.write(
+    "This tool converts/transforms the source excel file to the required format for deployment. Please upload your **source file** below."
+    )
 st.divider()
 
 uploaded_file = st.file_uploader(
