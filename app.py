@@ -172,7 +172,7 @@ st.set_page_config(layout="wide", page_title="Boots Coupons Excel Transformation
 col1, col2 = st.columns([1, 6])
 
 with col1:
-st.image("Logo.png", width=200)
+  st.image("Logo.png", width=200)
 
 with col2:
 st.title("Boots Coupons Excel Agent")
