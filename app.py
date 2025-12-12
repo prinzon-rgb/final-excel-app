@@ -138,12 +138,12 @@ def write_excel_with_autosize(df, buffer):
 st.set_page_config(layout="wide", page_title="Boots Coupons Excel Transformation Agent")
 col1, col2 = st.columns([1, 6])
 with col1:
-  st.image("Logo.png", width=200)
+st.image("Logo.png", width=200)
 with col2:
-  st.title("Boots Coupons Excel Agent")
-  st.write(
-    "This tool converts/transforms the source excel file to the required format for deployment. Please upload your **source file** below."
-    )
+st.title("Boots Coupons Excel Agent")
+st.write(
+  "This tool converts/transforms the source excel file to the required format for deployment. Please upload your **source file** below."
+  )
 st.divider()
 uploaded_file = st.file_uploader(
 "Choose an Excel file",
@@ -151,27 +151,27 @@ type="xlsx",
 help="Upload the source Excel file to be transformed."
 )
 if uploaded_file is not None:
-  try:
-        st.info(f"Processing `{uploaded_file.name}`...")
-        input_df = pd.read_excel(uploaded_file, dtype=str).fillna('')
-        if 'Offer Code' in input_df.columns:
-          input_df = input_df[input_df['Offer Code'].notna() & (input_df['Offer Code'] != '')].copy()
-        output_df = transform_excel(input_df)
-        st.success("Transformation Complete!")
-        output_buffer = BytesIO()
-        write_excel_with_autosize(output_df, output_buffer)
-        output_buffer.seek(0)
-        st.download_button(
-          label="⬇️ Download Transformed File",
-          data=output_buffer,
-          file_name=f"{uploaded_file.name.replace('.xlsx', '')}-transformed.xlsx",
-          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        st.subheader("Preview of Transformed Data")
-        st.dataframe(output_df)
-  except Exception as e:
-        st.error(f"An error occurred: {e}")
-        st.warning("Please ensure the uploaded file has a compatible structure.")
+try:
+      st.info(f"Processing `{uploaded_file.name}`...")
+      input_df = pd.read_excel(uploaded_file, dtype=str).fillna('')
+      if 'Offer Code' in input_df.columns:
+        input_df = input_df[input_df['Offer Code'].notna() & (input_df['Offer Code'] != '')].copy()
+      output_df = transform_excel(input_df)
+      st.success("Transformation Complete!")
+      output_buffer = BytesIO()
+      write_excel_with_autosize(output_df, output_buffer)
+      output_buffer.seek(0)
+      st.download_button(
+        label="⬇️ Download Transformed File",
+        data=output_buffer,
+        file_name=f"{uploaded_file.name.replace('.xlsx', '')}-transformed.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      )
+      st.subheader("Preview of Transformed Data")
+      st.dataframe(output_df)
+except Exception as e:
+      st.error(f"An error occurred: {e}")
+      st.warning("Please ensure the uploaded file has a compatible structure.")
 # --- Sticky Footer ---
 footer_css = """
 <style>
