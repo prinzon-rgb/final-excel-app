@@ -188,36 +188,36 @@ help="Upload the source Excel file to be transformed."
 )
 
 if uploaded_file is not None:
-try:
-      st.info(f"Processing `{uploaded_file.name}`...")
+  try:
+        st.info(f"Processing `{uploaded_file.name}`...")
+    
+        input_df = pd.read_excel(uploaded_file, dtype=str).fillna('')
+    
+        if 'Offer Code' in input_df.columns:
+          input_df = input_df[input_df['Offer Code'].notna() & (input_df['Offer Code'] != '')].copy()
   
-      input_df = pd.read_excel(uploaded_file, dtype=str).fillna('')
+        output_df = transform_excel(input_df)
+    
+        st.success("Transformation Complete!")
   
-      if 'Offer Code' in input_df.columns:
-        input_df = input_df[input_df['Offer Code'].notna() & (input_df['Offer Code'] != '')].copy()
-
-      output_df = transform_excel(input_df)
+        # CORRECTED LOGIC: Use the new autosize function
+        output_buffer = BytesIO()
+        write_excel_with_autosize(output_df, output_buffer)
+        output_buffer.seek(0)
+    
+        st.download_button(
+          label="⬇️ Download Transformed File",
+          data=output_buffer,
+          file_name=f"{uploaded_file.name.replace('.xlsx', '')}-transformed.xlsx",
+          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
   
-      st.success("Transformation Complete!")
-
-      # CORRECTED LOGIC: Use the new autosize function
-      output_buffer = BytesIO()
-      write_excel_with_autosize(output_df, output_buffer)
-      output_buffer.seek(0)
-  
-      st.download_button(
-        label="⬇️ Download Transformed File",
-        data=output_buffer,
-        file_name=f"{uploaded_file.name.replace('.xlsx', '')}-transformed.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-      )
-
-      st.subheader("Preview of Transformed Data")
-      st.dataframe(output_df)
-  
-except Exception as e:
-      st.error(f"An error occurred: {e}")
-      st.warning("Please ensure the uploaded file has a compatible structure.")
+        st.subheader("Preview of Transformed Data")
+        st.dataframe(output_df)
+    
+  except Exception as e:
+        st.error(f"An error occurred: {e}")
+        st.warning("Please ensure the uploaded file has a compatible structure.")
   
 # --- Sticky Footer ---
 footer_css = """
