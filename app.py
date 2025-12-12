@@ -80,14 +80,17 @@ def transform_excel(df_a):
         processed_text = str(offer_text).replace('\n', ' ')
         processed_text = processed_text.upper().replace('NO7', 'No7')
         
-        # FIX: Replace string WITH space first to consume the space and prevent indentation on line 2
+        # UPDATED: Replace "KEYWORD " (with space) -> "KEYWORD\n" (no space)
         processed_text = processed_text.replace('WHEN YOU SPEND ', 'WHEN YOU SPEND\n').replace('WHEN YOU SPEND', 'WHEN YOU SPEND\n')
         processed_text = processed_text.replace('WHEN YOU BUY ', 'WHEN YOU BUY\n').replace('WHEN YOU BUY', 'WHEN YOU BUY\n')
         processed_text = processed_text.replace('WHEN YOU SHOP ', 'WHEN YOU SHOP\n').replace('WHEN YOU SHOP', 'WHEN YOU SHOP\n')
         
+        # Final cleanup: Ensure no line starts with a space
+        processed_text = processed_text.replace('\n ', '\n')
+        
         return processed_text
     df_b['Offers'] = df_a.apply(create_offers_text, axis=1)
-    
+        
     df_b['_Descriptor'] = df_a.get('Small Print\nInclusions/Exclusions/Medical Information if needed. Use full stop and commas', '')
     
     def format_conditions_1(text):
@@ -96,18 +99,11 @@ def transform_excel(df_a):
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         
         if not lines: return ''
-        if len(lines) == 1: return lines[0]
-    
-        # FIX: BA Pattern logic
-        # Line 1 (Header) -> Single Newline -> Line 2
-        first_block = lines[0] + '\n' + lines[1]
         
-        if len(lines) > 2:
-            # All subsequent lines are separated by Double Newlines
-            rest_of_text = '\n\n'.join(lines[2:])
-            processed_text = first_block + '\n\n' + rest_of_text
-        else:
-            processed_text = first_block
+        # UPDATED: Join everything with a single newline to prevent gaps in lists
+        processed_text = '\n'.join(lines)
+    
+        return processed_text
     
         # Keep the URL fix
         processed_text = processed_text.replace('please visit\n\n', 'please visit\n')
