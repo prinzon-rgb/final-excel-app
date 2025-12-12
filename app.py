@@ -17,11 +17,9 @@ def transform_excel(df_a):
   offer_code = df_a.get('Offer Code', pd.Series(dtype='str')).fillna('')
   tnc_no = df_a.get('T&C no.', pd.Series(dtype='str')).fillna('')
   df_b['ITEM NO'] = offer_code + tnc_no
-  # CORRECTED LOGIC: Boots_Filename is just the Offer Code
   df_b['Boots_Filename'] = offer_code
   df_b['Barcode'] = df_a.get('Barcode', '')
   
-  # Helper function to find "Use Twice"
   offer_text_col_name = next((col for col in df_a.columns if 'Offer Text' in col), None)
   def is_use_twice(row):
       if str(row.get('Use Twice?', '')).lower().strip() == 'use twice': return True
@@ -31,18 +29,16 @@ def transform_excel(df_a):
       if offer_text_col_name and str(row.get(offer_text_col_name, '')).lower().strip() == 'use twice': return True
       return False
   
-  # Layout_Types
   def determine_layout_type(row):
       p1 = str(row.get('Part 1', ''))
       if p1.lower() == 'save': return 'L2'
       return '(Default)'
   df_b['Layout_Types'] = df_a.apply(determine_layout_type, axis=1)
   
-  # CORRECTED LOGIC: Use newline '\n' instead of '<br/>'
+  # FINAL CORRECTED LOGIC for Validity: Use a single '\n' for a real newline.
   date_col_name = next((col for col in df_a.columns if 'Date for Coupons' in col), None)
-  df_b['Validity'] = df_a[date_col_name].apply(lambda x: f"Valid {x.replace(' to ', ' \\nto ')}" if x else '') if date_col_name else ''
+  df_b['Validity'] = df_a[date_col_name].apply(lambda x: f"Valid {x.replace(' to ', '\nto ')}" if x else '') if date_col_name else ''
   
-  # Points Formatting
   def format_point1(row):
       if is_use_twice(row): return 'DOUBLE'
       p1 = row.get('Part 1', '')
@@ -51,7 +47,6 @@ def transform_excel(df_a):
       if val_str.lower().endswith('p'): return val_str
       try:
           num_val = float(val_str.replace('£', ''))
-          # CORRECTED LOGIC: Format whole numbers without decimals
           if num_val.is_integer(): return f"£{int(num_val)}"
           return f"£{num_val:.2f}"
       except (ValueError, TypeError): return val_str.upper()
@@ -66,7 +61,7 @@ def transform_excel(df_a):
               num_val = float(val_p2)
               if np.isclose(num_val, 0.3333333333333333): return '1/3'
               if 0 < num_val < 1: return f"{int(num_val * 100)}%"
-              return f"{float(val_p2):g}" # Use %g to avoid trailing .0
+              return f"{float(val_p2):g}"
           except (ValueError, TypeError): return val_p2.upper()
       return val_p2.upper()
   df_b['Point2'] = df_a.apply(format_point2, axis=1)
@@ -78,34 +73,25 @@ def transform_excel(df_a):
       if is_use_twice(row): return ''
       offer_text = row.get(offer_text_col_name, '') if offer_text_col_name else ''
       if not offer_text: return ''
-      
-      # CORRECTED LOGIC: Use newline '\n' instead of '<br/>'
-      processed_text = str(offer_text).replace('\n', ' ') # First remove any unwanted line breaks
+      processed_text = str(offer_text).replace('\n', ' ')
       processed_text = processed_text.upper().replace('NO7', 'No7')
       processed_text = processed_text.replace('WHEN YOU SPEND', 'WHEN YOU SPEND\n').replace('WHEN YOU BUY', 'WHEN YOU BUY\n').replace('WHEN YOU SHOP', 'WHEN YOU SHOP\n')
       return processed_text
   df_b['Offers'] = df_a.apply(create_offers_text, axis=1)
   
-  # Descriptor & T&Cs
-  small_print_col_name = next((col for col in df_a.columns if 'Small Print' in col), None)
-  df_b['_Descriptor'] = df_a.get(small_print_col_name, '') if small_print_col_name else ''
+  df_b['_Descriptor'] = df_a.get('Small Print\nInclusions/Exclusions/Medical Information if needed. Use full stop and commas', '')
   
+  # FINAL CORRECTED LOGIC for Conditions_1: Handles double newlines, URL cases, and strips all lines.
   def format_conditions_1(text):
-      if not isinstance(text, str): return ''
-      lines = text.split('\n')
-      result_parts = []
-      i = 0
-      while i < len(lines):
-          current_line = lines[i].strip()
-          if (i + 1 < len(lines)) and ('boots.com' in lines[i+1] or 'www.' in lines[i+1]):
-              result_parts.append(current_line + ' ' + lines[i+1].strip())
-              i += 2
-          else:
-              result_parts.append(current_line)
-              i += 1
-      # CORRECTED LOGIC: Join with newline '\n' instead of '<br/>'
-      return '\n'.join(result_parts)
-  
+      if not isinstance(text, str) or not text.strip(): return ''
+      # Split by newline, strip each line of whitespace, and filter out any that became empty
+      lines = [line.strip() for line in text.split('\n') if line.strip()]
+      # Join with double newlines to create the blank lines between paragraphs
+      processed_text = '\n\n'.join(lines)
+      # Find and fix the specific case where a URL follows "please visit"
+      processed_text = processed_text.replace('please visit\n\n', 'please visit\n')
+      return processed_text
+
   if 'T&Cs Description' in df_a.columns:
       df_b['Conditions_1'] = df_a['T&Cs Description'].apply(format_conditions_1)
   else:
@@ -115,7 +101,6 @@ def transform_excel(df_a):
       if not val or not str(val).startswith('/'): return ''
       try:
           num = int(str(val).replace('/', ''))
-          # Use format without padding if the number is not zero-padded in the source
           return f'Offer{num}'
       except (ValueError, TypeError): return ''
   df_b['Offer_types'] = df_a.get('T&C no.', pd.Series(dtype='str')).apply(format_offer_type)
@@ -126,7 +111,7 @@ def transform_excel(df_a):
   final_columns = ['ITEM NO', 'Layout_Types', 'Validity', 'Point1', 'Point2', 'Point3', 'LogoName', 'Offers', '_Descriptor', 'Offer_types', 'Conditions_1', 'Conditions_3', '_CodeStyles', 'Barcode', 'Boots_Filename']
   df_b = df_b.reindex(columns=final_columns, fill_value='')
 
-  # FINAL CLEANING: Strip whitespace from all string cells before returning
+  # Final cleaning pass to strip all string cells
   df_b = df_b.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
   return df_b
@@ -135,90 +120,58 @@ def transform_excel(df_a):
 def write_excel_with_autosize(df, buffer):
   with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
       df.to_excel(writer, index=False, sheet_name='Sheet1')
-      
       workbook = writer.book
       worksheet = writer.sheets['Sheet1']
-
-      # Define a cell format for text wrapping
       wrap_format = workbook.add_format({'text_wrap': True, 'valign': 'top'})
-
-      # Auto-adjust column widths
       for idx, col in enumerate(df):
           series = df[col]
-          max_len = max((
-              series.astype(str).map(len).max(),
+          # Calculate max length for column width
+          # For multi-line cells, we take the length of the longest line
+          max_len = max(
+              series.astype(str).apply(lambda x: max(len(line) for line in x.split('\n')) if '\n' in x else len(x))).max(),
               len(str(series.name))
-          )) + 1
+          ) + 2 # Add a little extra padding
           worksheet.set_column(idx, idx, max_len)
-      
-      # Auto-adjust row heights
-      for i, row in df.iterrows():
-          max_lines = 0
-          for col in df.columns:
-              cell_value = str(row[col])
-              lines = cell_value.count('\n') + 1
-              if lines > max_lines:
-                  max_lines = lines
-          # Set row height (15 is a standard point height for one line)
-          worksheet.set_row(i + 1, max_lines * 15)
-
-      # Apply the wrap format to all cells
-      worksheet.set_default_row(15) # Set a default row height
-      worksheet.conditional_format('A1:O1000', {'type': 'no_blanks', 'format': wrap_format})
+      worksheet.conditional_format(0, 0, len(df), len(df.columns)-1, {'type': 'no_errors', 'format': wrap_format})
 
 # --- 2. The Streamlit User Interface ---
 st.set_page_config(layout="wide", page_title="Boots Coupons Excel Transformation Agent")
-
 col1, col2 = st.columns([1, 6])
-
 with col1:
   st.image("Logo.png", width=200)
-
 with col2:
   st.title("Boots Coupons Excel Agent")
   st.write(
     "This tool converts/transforms the source excel file to the required format for deployment. Please upload your **source file** below."
     )
 st.divider()
-
 uploaded_file = st.file_uploader(
 "Choose an Excel file",
 type="xlsx",
 help="Upload the source Excel file to be transformed."
 )
-
 if uploaded_file is not None:
   try:
         st.info(f"Processing `{uploaded_file.name}`...")
-    
         input_df = pd.read_excel(uploaded_file, dtype=str).fillna('')
-    
         if 'Offer Code' in input_df.columns:
           input_df = input_df[input_df['Offer Code'].notna() & (input_df['Offer Code'] != '')].copy()
-  
         output_df = transform_excel(input_df)
-    
         st.success("Transformation Complete!")
-  
-        # CORRECTED LOGIC: Use the new autosize function
         output_buffer = BytesIO()
         write_excel_with_autosize(output_df, output_buffer)
         output_buffer.seek(0)
-    
         st.download_button(
           label="⬇️ Download Transformed File",
           data=output_buffer,
           file_name=f"{uploaded_file.name.replace('.xlsx', '')}-transformed.xlsx",
           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-  
         st.subheader("Preview of Transformed Data")
         st.dataframe(output_df)
-    
   except Exception as e:
         st.error(f"An error occurred: {e}")
         st.warning("Please ensure the uploaded file has a compatible structure.")
-  
 # --- Sticky Footer ---
 footer_css = """
 <style>
@@ -243,11 +196,9 @@ text-decoration: underline;
 }
 </style>
 """
-
 footer_html = """
 <div class="footer">
 Developed by Prince John | Contact <a href='mailto:prince.john@hogarth.com' target="_blank">prince.john@hogarth.com</a> for any assistance
 </div>
 """
-
 st.markdown(footer_css + footer_html, unsafe_allow_html=True)
