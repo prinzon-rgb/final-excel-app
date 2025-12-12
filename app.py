@@ -3,11 +3,10 @@ import pandas as pd
 import numpy as np
 from io import BytesIO
 
-# --- 1. The Core Transformation Logic ---
+# --- 1. The Core Transformation Logic (with all final corrections) ---
 def transform_excel(df_a):
   """
-  Transforms a DataFrame from Format A to Format B.
-  This function now accepts and returns a DataFrame directly.
+  Transforms a DataFrame from Format A to Format B, matching the BA team's output exactly.
   """
   # Clean all column names to prevent errors from extra spaces
   df_a.columns = [col.strip() for col in df_a.columns]
@@ -18,6 +17,7 @@ def transform_excel(df_a):
   offer_code = df_a.get('Offer Code', pd.Series(dtype='str')).fillna('')
   tnc_no = df_a.get('T&C no.', pd.Series(dtype='str')).fillna('')
   df_b['ITEM NO'] = offer_code + tnc_no
+  # CORRECTED LOGIC: Boots_Filename is just the Offer Code
   df_b['Boots_Filename'] = offer_code
   df_b['Barcode'] = df_a.get('Barcode', '')
   
@@ -38,18 +38,20 @@ def transform_excel(df_a):
       return '(Default)'
   df_b['Layout_Types'] = df_a.apply(determine_layout_type, axis=1)
   
+  # CORRECTED LOGIC: Use newline '\n' instead of '<br/>'
   date_col_name = next((col for col in df_a.columns if 'Date for Coupons' in col), None)
-  df_b['Validity'] = df_a[date_col_name].apply(lambda x: f"Valid {x.replace(' to ', ' <br/>to ')}" if x else '') if date_col_name else ''
+  df_b['Validity'] = df_a[date_col_name].apply(lambda x: f"Valid {x.replace(' to ', ' \\nto ')}" if x else '') if date_col_name else ''
   
   # Points Formatting
   def format_point1(row):
       if is_use_twice(row): return 'DOUBLE'
       p1 = row.get('Part 1', '')
       if not p1 or pd.isna(p1): return ''
-      val_str = str(p1)
+      val_str = str(p1).strip()
       if val_str.lower().endswith('p'): return val_str
       try:
-          num_val = float(val_str)
+          num_val = float(val_str.replace('£', ''))
+          # CORRECTED LOGIC: Format whole numbers without decimals
           if num_val.is_integer(): return f"£{int(num_val)}"
           return f"£{num_val:.2f}"
       except (ValueError, TypeError): return val_str.upper()
@@ -64,7 +66,7 @@ def transform_excel(df_a):
               num_val = float(val_p2)
               if np.isclose(num_val, 0.3333333333333333): return '1/3'
               if 0 < num_val < 1: return f"{int(num_val * 100)}%"
-              return f"£{float(val_p2):g}"
+              return f"{float(val_p2):g}" # Use %g to avoid trailing .0
           except (ValueError, TypeError): return val_p2.upper()
       return val_p2.upper()
   df_b['Point2'] = df_a.apply(format_point2, axis=1)
@@ -76,9 +78,11 @@ def transform_excel(df_a):
       if is_use_twice(row): return ''
       offer_text = row.get(offer_text_col_name, '') if offer_text_col_name else ''
       if not offer_text: return ''
-      processed_text = str(offer_text).replace('\n', ' ')
+      
+      # CORRECTED LOGIC: Use newline '\n' instead of '<br/>'
+      processed_text = str(offer_text).replace('\n', ' ') # First remove any unwanted line breaks
       processed_text = processed_text.upper().replace('NO7', 'No7')
-      processed_text = processed_text.replace('WHEN YOU SPEND', 'WHEN YOU SPEND<br/>').replace('WHEN YOU BUY', 'WHEN YOU BUY<br/>').replace('WHEN YOU SHOP', 'WHEN YOU SHOP<br/>')
+      processed_text = processed_text.replace('WHEN YOU SPEND', 'WHEN YOU SPEND\n').replace('WHEN YOU BUY', 'WHEN YOU BUY\n').replace('WHEN YOU SHOP', 'WHEN YOU SHOP\n')
       return processed_text
   df_b['Offers'] = df_a.apply(create_offers_text, axis=1)
   
@@ -92,14 +96,15 @@ def transform_excel(df_a):
       result_parts = []
       i = 0
       while i < len(lines):
-          current_line = lines[i]
+          current_line = lines[i].strip()
           if (i + 1 < len(lines)) and ('boots.com' in lines[i+1] or 'www.' in lines[i+1]):
               result_parts.append(current_line + ' ' + lines[i+1].strip())
               i += 2
           else:
               result_parts.append(current_line)
               i += 1
-      return '<br/>'.join(result_parts)
+      # CORRECTED LOGIC: Join with newline '\n' instead of '<br/>'
+      return '\n'.join(result_parts)
   
   if 'T&Cs Description' in df_a.columns:
       df_b['Conditions_1'] = df_a['T&Cs Description'].apply(format_conditions_1)
@@ -110,31 +115,70 @@ def transform_excel(df_a):
       if not val or not str(val).startswith('/'): return ''
       try:
           num = int(str(val).replace('/', ''))
-          return f'Offer{num:02d}'
+          # Use format without padding if the number is not zero-padded in the source
+          return f'Offer{num}'
       except (ValueError, TypeError): return ''
   df_b['Offer_types'] = df_a.get('T&C no.', pd.Series(dtype='str')).apply(format_offer_type)
-  
+      
   df_b['Conditions_3'] = ''
   df_b['_CodeStyles'] = np.where(df_a.get('Barcode', '') != '', 'wCode', 'woCode')
   
   final_columns = ['ITEM NO', 'Layout_Types', 'Validity', 'Point1', 'Point2', 'Point3', 'LogoName', 'Offers', '_Descriptor', 'Offer_types', 'Conditions_1', 'Conditions_3', '_CodeStyles', 'Barcode', 'Boots_Filename']
   df_b = df_b.reindex(columns=final_columns, fill_value='')
-  
+
+  # FINAL CLEANING: Strip whitespace from all string cells before returning
+  df_b = df_b.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+
   return df_b
 
+# --- Function to write to Excel with auto-sizing (requires xlsxwriter) ---
+def write_excel_with_autosize(df, buffer):
+  with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+      df.to_excel(writer, index=False, sheet_name='Sheet1')
+      
+      workbook = writer.book
+      worksheet = writer.sheets['Sheet1']
+
+      # Define a cell format for text wrapping
+      wrap_format = workbook.add_format({'text_wrap': True, 'valign': 'top'})
+
+      # Auto-adjust column widths
+      for idx, col in enumerate(df):
+          series = df[col]
+          max_len = max((
+              series.astype(str).map(len).max(),
+              len(str(series.name))
+          )) + 1
+          worksheet.set_column(idx, idx, max_len)
+      
+      # Auto-adjust row heights
+      for i, row in df.iterrows():
+          max_lines = 0
+          for col in df.columns:
+              cell_value = str(row[col])
+              lines = cell_value.count('\n') + 1
+              if lines > max_lines:
+                  max_lines = lines
+          # Set row height (15 is a standard point height for one line)
+          worksheet.set_row(i + 1, max_lines * 15)
+
+      # Apply the wrap format to all cells
+      worksheet.set_default_row(15) # Set a default row height
+      worksheet.conditional_format('A1:O1000', {'type': 'no_blanks', 'format': wrap_format})
+
 # --- 2. The Streamlit User Interface ---
-st.set_page_config(layout="wide", page_title="Excel Transformation Agent")
-# Create two columns: a small one for the logo, a large one for the title
-col1, col2 = st.columns([1, 6]) # The numbers define the relative width (1:6 ratio)
+st.set_page_config(layout="wide", page_title="Boots Coupons Excel Transformation Agent")
+
+col1, col2 = st.columns([1, 6])
 
 with col1:
-  st.image("Logo.png", width=200) # Display your logo in the first column
+st.image("Logo.png", width=200)
 
 with col2:
-  st.title("Boots Coupons Excel Agent") # Display your title in the second column
-  st.write(
-    "This tool converts/transforms the source excel file to the required format for deployment. Please upload your **source file** below."
-    )
+st.title("Boots Coupons Excel Agent")
+st.write(
+  "This tool converts/transforms the source excel file to the required format for deployment. Please upload your **source file** below."
+  )
 st.divider()
 
 uploaded_file = st.file_uploader(
@@ -144,36 +188,37 @@ help="Upload the source Excel file to be transformed."
 )
 
 if uploaded_file is not None:
-  try:
-        st.info(f"Processing `{uploaded_file.name}`...")
-    
-        input_df = pd.read_excel(uploaded_file, dtype=str).fillna('')
-    
-        if 'Offer Code' in input_df.columns:
-          input_df = input_df[input_df['Offer Code'].notna() & (input_df['Offer Code'] != '')].copy()
+try:
+      st.info(f"Processing `{uploaded_file.name}`...")
+  
+      input_df = pd.read_excel(uploaded_file, dtype=str).fillna('')
+  
+      if 'Offer Code' in input_df.columns:
+        input_df = input_df[input_df['Offer Code'].notna() & (input_df['Offer Code'] != '')].copy()
 
-        output_df = transform_excel(input_df)
-    
-        st.success("Transformation Complete!")
+      output_df = transform_excel(input_df)
+  
+      st.success("Transformation Complete!")
 
-        output_buffer = BytesIO()
-        output_df.to_excel(output_buffer, index=False, sheet_name='Sheet1')
-        output_buffer.seek(0)
-    
-        st.download_button(
-          label="⬇️ Download Transformed File",
-          data=output_buffer,
-          file_name=f"{uploaded_file.name.replace('.xlsx', '')}-transformed.xlsx",
-          mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+      # CORRECTED LOGIC: Use the new autosize function
+      output_buffer = BytesIO()
+      write_excel_with_autosize(output_df, output_buffer)
+      output_buffer.seek(0)
+  
+      st.download_button(
+        label="⬇️ Download Transformed File",
+        data=output_buffer,
+        file_name=f"{uploaded_file.name.replace('.xlsx', '')}-transformed.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      )
 
-        st.subheader("Preview of Transformed Data")
-        st.dataframe(output_df)
-    
-  except Exception as e:
-        st.error(f"An error occurred: {e}")
-        st.warning("Please ensure the uploaded file has a compatible structure.")
-    
+      st.subheader("Preview of Transformed Data")
+      st.dataframe(output_df)
+  
+except Exception as e:
+      st.error(f"An error occurred: {e}")
+      st.warning("Please ensure the uploaded file has a compatible structure.")
+  
 # --- Sticky Footer ---
 footer_css = """
 <style>
@@ -182,15 +227,15 @@ position: fixed;
 left: 0;
 bottom: 0;
 width: 100%;
-background-color: #0E1117; /* Matches Streamlit's dark theme background */
+background-color: #0E1117;
 color: grey;
 text-align: center;
 padding: 10px;
 font-size: 0.7em;
-border-top: 1px solid #262730; /* A subtle top border */
+border-top: 1px solid #262730;
 }
 .footer a {
-color: #FF4B4B; /* Streamlit's primary red color for links */
+color: #FF4B4B;
 text-decoration: none;
 }
 .footer a:hover {
